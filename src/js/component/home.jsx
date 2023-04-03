@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from "react";
 
 const Task = ({ index, task, deleteTask }) => {
   const [hovered, setHovered] = useState(false);
 
   return (
-    <li onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <div>{task}</div>
+    <li
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <div>{task.label}</div>
       {hovered && <button onClick={() => deleteTask(index)}>Delete</button>}
     </li>
   );
@@ -13,21 +16,86 @@ const Task = ({ index, task, deleteTask }) => {
 
 const TodoList = () => {
   const [tasks, setTasks] = useState([]);
+  const [username, setUsername] = useState("");
 
-  const addTask = (e) => {
+  useEffect(() => {
+    fetch(`https://assets.breatheco.de/apis/fake/todos/user/${username}`)
+      .then((response) => response.json())
+      .then((data) => {
+        setTasks(data);
+      });
+  }, [username]);
+
+  const createNewUser = () => {
+    fetch(`https://assets.breatheco.de/apis/fake/todos/user/${username}`, {
+      method: "POST",
+      body: JSON.stringify([]),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  };
+
+  const addTask = async (e) => {
     e.preventDefault();
     const newTask = e.target.elements.task.value.trim();
     if (newTask) {
-      setTasks([...tasks, newTask]);
-      e.target.elements.task.value = '';
+      const newTasks = [...tasks, { label: newTask, done: false }];
+      setTasks(newTasks);
+      e.target.elements.task.value = "";
+      try {
+        const response = await fetch(`https://assets.breatheco.de/apis/fake/todos/user/${username}`, {
+          method: "PUT",
+          body: JSON.stringify(newTasks),
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok");
+        }
+      } catch (error) {
+        console.error("There was a problem updating the tasks:", error);
+      }
     }
   };
-
-  const deleteTask = (index) => {
-    const newTasks = [...tasks];
-    newTasks.splice(index, 1);
+  
+  const deleteTask = async (index) => {
+    const newTasks = tasks.filter((task, i) => i !== index);
     setTasks(newTasks);
+    try {
+      const response = await fetch(`https://assets.breatheco.de/apis/fake/todos/user/${username}`, {
+        method: "PUT",
+        body: JSON.stringify(newTasks),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+    } catch (error) {
+      console.error("There was a problem updating the tasks:", error);
+    }
   };
+  
+  const deleteAllTasks = async () => {
+    setTasks([]);
+    try {
+      const response = await fetch(`https://assets.breatheco.de/apis/fake/todos/user/${username}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+    } catch (error) {
+      console.error("There was a problem deleting the tasks:", error);
+    }
+  };
+  
 
   return (
     <div className="todo-list">
@@ -36,14 +104,31 @@ const TodoList = () => {
         <input type="text" name="task" placeholder="Add a task" />
         <button type="submit">Add Task</button>
       </form>
+      <div>
+        <input
+          type="text"
+          value={username}
+          placeholder="Enter your username"
+          onChange={(e) => setUsername(e.target.value)}
+        />
+        <button onClick={createNewUser}>Create User</button>
+      </div>
       {tasks.length === 0 ? (
         <p>No tasks, add a task</p>
       ) : (
-        <ul>
-          {tasks.map((task, index) => (
-            <Task key={index} index={index} task={task} deleteTask={deleteTask} />
-          ))}
-        </ul>
+        <>
+          <ul>
+            {tasks.map((task, index) => (
+              <Task
+                key={index}
+                index={index}
+                task={task}
+                deleteTask={deleteTask}
+              />
+            ))}
+          </ul>
+          <button onClick={deleteAllTasks}>Clear All Tasks</button>
+        </>
       )}
     </div>
   );
